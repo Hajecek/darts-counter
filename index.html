@@ -31,6 +31,12 @@
             text-align: center;
         }
         .score { font-size: 24px; margin: 20px 0; }
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+            font-size: 18px;
+        }
         .input-area {
             margin: 20px 0;
             display: flex;
@@ -46,6 +52,10 @@
 <body>
     <div class="container">
         <div class="score">Score: <span id="currentScore">501</span></div>
+        <div class="stats">
+            <div>Kolo: <span id="roundCounter">1</span></div>
+            <div>Celkem šipek: <span id="totalDarts">0</span></div>
+        </div>
         <div class="throws">
             <div class="throw" id="throw1">-</div>
             <div class="throw" id="throw2">-</div>
@@ -70,6 +80,8 @@
         let throws = [];
         let history = [{score: 501, throws: []}];
         let activeMultiplier = 1;
+        let currentRound = 1;
+        let totalDarts = 0;
         const maxThrows = 3;
 
         function addManualScore() {
@@ -96,12 +108,14 @@
                 multiplier: 1,
                 points: points
             });
+            totalDarts++;
             saveState();
             updateDisplay();
             
             if (throws.length >= maxThrows) {
                 setTimeout(() => {
                     throws = [];
+                    currentRound++;
                     saveState();
                     updateDisplay();
                 }, 2000);
@@ -110,6 +124,9 @@
 
         function updateDisplay() {
             document.getElementById('currentScore').textContent = currentScore;
+            document.getElementById('roundCounter').textContent = currentRound;
+            document.getElementById('totalDarts').textContent = totalDarts;
+            
             for (let i = 1; i <= maxThrows; i++) {
                 const throwElement = document.getElementById(`throw${i}`);
                 const throwValue = throws[i-1];
@@ -122,7 +139,9 @@
         function saveState() {
             history.push({
                 score: currentScore,
-                throws: [...throws]
+                throws: [...throws],
+                round: currentRound,
+                totalDarts: totalDarts
             });
         }
 
@@ -142,6 +161,7 @@
                 points: points
             });
             currentScore -= points;
+            totalDarts++;
             saveState();
             updateDisplay();
             
@@ -152,6 +172,7 @@
             if (throws.length >= maxThrows) {
                 setTimeout(() => {
                     throws = [];
+                    currentRound++;
                     saveState();
                     updateDisplay();
                 }, 2000);
@@ -164,6 +185,8 @@
                 const lastState = history[history.length - 1];
                 currentScore = lastState.score;
                 throws = [...lastState.throws];
+                currentRound = lastState.round;
+                totalDarts = lastState.totalDarts;
                 updateDisplay();
             }
         }
@@ -173,6 +196,8 @@
             throws = [];
             history = [{score: 501, throws: []}];
             activeMultiplier = 1;
+            currentRound = 1;
+            totalDarts = 0;
             toggleMultiplier(1);
             updateDisplay();
         }
