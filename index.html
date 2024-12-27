@@ -72,6 +72,10 @@
             <div>Kolo: <span id="roundCounter">1</span></div>
             <div>Celkem šipek: <span id="totalDarts">0</span></div>
         </div>
+        <div class="stats">
+            <div>Průměr na 3 šipky: <span id="avgPerThree">0.00</span></div>
+            <div>Průměr prvních 9: <span id="avgFirstNine">0.00</span></div>
+        </div>
         <div class="throws">
             <div class="throw" id="throw1">-</div>
             <div class="throw" id="throw2">-</div>
@@ -217,10 +221,37 @@
             }
         }
 
+        function calculateAverages() {
+            if (totalDarts === 0) return { avgPerThree: 0, avgFirstNine: 0 };
+            
+            // Výpočet průměru na 3 šipky
+            const totalScore = 501 - currentScore;
+            const avgPerThree = (totalScore / totalDarts) * 3;
+            
+            // Výpočet průměru prvních 9 šipek
+            let firstNineScore = 0;
+            if (totalDarts >= 9) {
+                firstNineScore = 501 - history[Math.min(3, history.length - 1)].score;
+            } else {
+                firstNineScore = 501 - currentScore;
+            }
+            const avgFirstNine = totalDarts >= 9 ? (firstNineScore / 9) * 3 : 0;
+            
+            return {
+                avgPerThree: Math.round(avgPerThree * 100) / 100,
+                avgFirstNine: Math.round(avgFirstNine * 100) / 100
+            };
+        }
+
         function updateDisplay() {
             document.getElementById('currentScore').textContent = currentScore;
             document.getElementById('roundCounter').textContent = currentRound;
             document.getElementById('totalDarts').textContent = totalDarts;
+            
+            // Přidáno: Aktualizace průměrů
+            const averages = calculateAverages();
+            document.getElementById('avgPerThree').textContent = averages.avgPerThree;
+            document.getElementById('avgFirstNine').textContent = averages.avgFirstNine;
             
             if (voiceMode === 'total') {
                 const lastState = history[history.length - 1];
