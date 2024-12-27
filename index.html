@@ -179,7 +179,9 @@
 
         // Vytvoření tlačítek s čísly
         const numberGrid = document.getElementById('numberGrid');
-        for (let i = 1; i <= 25; i++) {
+        const numbers = [...Array(20).keys()].map(i => i + 1);
+        numbers.push(25, 0);
+        for (const i of numbers) {
             const btn = document.createElement('button');
             btn.textContent = i;
             btn.className = 'number-btn';
