@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .number-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 5px;
+            margin: 20px 0;
+        }
+        .number-btn, .control-btn {
+            padding: 15px;
+            font-size: 16px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            background: white;
+        }
+        .selected { background-color: #4CAF50; color: white; }
+        .active-multiplier { background-color: #ff4444; color: white; }
+        .controls { margin: 20px 0; }
+        .throws {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .throw {
+            padding: 10px;
+            border: 1px solid #ccc;
+            min-width: 100px;
+            text-align: center;
+        }
+        .score { font-size: 24px; margin: 20px 0; }
+        .input-area {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+        }
+        #manualInput {
+            padding: 10px;
+            font-size: 16px;
+            width: 100px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="score">Score: <span id="currentScore">501</span></div>
+        <div class="throws">
+            <div class="throw" id="throw1">-</div>
+            <div class="throw" id="throw2">-</div>
+            <div class="throw" id="throw3">-</div>
+        </div>
+        <div class="input-area">
+            <input type="number" id="manualInput" placeholder="Zadej body">
+            <button onclick="addManualScore()" class="control-btn">Přidat</button>
+        </div>
+        <div class="controls">
+            <button id="voiceBtn" class="control-btn">🎤 Hlasový vstup</button>
+            <button onclick="toggleMultiplier(2)" id="doubleBtn" class="control-btn">Double</button>
+            <button onclick="toggleMultiplier(3)" id="tripleBtn" class="control-btn">Triple</button>
+            <button onclick="undoLastThrow()" class="control-btn">↩️ Zpět</button>
+            <button onclick="resetGame()" class="control-btn">🔄 Reset</button>
+        </div>
+        <div id="numberGrid" class="number-grid"></div>
+    </div>
+
+    <script>
+        let currentScore = 501;
+        let throws = [];
+        let history = [{score: 501, throws: []}];
+        let activeMultiplier = 1;
+        const maxThrows = 3;
+
+        function addManualScore() {
+            const input = document.getElementById('manualInput');
+            const value = parseInt(input.value);
+            if (!isNaN(value) && value > 0) {
+                addScore(value);
+                input.value = '';
+            }
+        }
+
+        document.getElementById('manualInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addManualScore();
+            }
+        });
+
+        function addScore(points) {
+            if (throws.length >= maxThrows) return;
+            
+            currentScore -= points;
+            throws.push({
+                base: points,
+                multiplier: 1,
+                points: points
+            });
+            saveState();
+            updateDisplay();
+            
+            if (throws.length >= maxThrows) {
+                setTimeout(() => {
+                    throws = [];
+                    saveState();
+                    updateDisplay();
+                }, 2000);
+            }
+        }
+
+        function updateDisplay() {
+            document.getElementById('currentScore').textContent = currentScore;
+            for (let i = 1; i <= maxThrows; i++) {
+                const throwElement = document.getElementById(`throw${i}`);
+                const throwValue = throws[i-1];
+                throwElement.textContent = throwValue ? 
+                    `${throwValue.points} (${throwValue.base}×${throwValue.multiplier})` : 
+                    '-';
+            }
+        }
+
+        function saveState() {
+            history.push({
+                score: currentScore,
+                throws: [...throws]
+            });
+        }
+
+        function toggleMultiplier(value) {
+            activeMultiplier = activeMultiplier === value ? 1 : value;
+            document.getElementById('doubleBtn').classList.toggle('active-multiplier', activeMultiplier === 2);
+            document.getElementById('tripleBtn').classList.toggle('active-multiplier', activeMultiplier === 3);
+        }
+
+        function selectNumber(num) {
+            if (throws.length >= maxThrows) return;
+            
+            const points = num * activeMultiplier;
+            throws.push({
+                base: num,
+                multiplier: activeMultiplier,
+                points: points
+            });
+            currentScore -= points;
+            saveState();
+            updateDisplay();
+            
+            if (activeMultiplier !== 1) {
+                toggleMultiplier(activeMultiplier);
+            }
+            
+            if (throws.length >= maxThrows) {
+                setTimeout(() => {
+                    throws = [];
+                    saveState();
+                    updateDisplay();
+                }, 2000);
+            }
+        }
+
+        function undoLastThrow() {
+            if (history.length > 1) {
+                history.pop();
+                const lastState = history[history.length - 1];
+                currentScore = lastState.score;
+                throws = [...lastState.throws];
+                updateDisplay();
+            }
+        }
+
+        function resetGame() {
+            currentScore = 501;
+            throws = [];
+            history = [{score: 501, throws: []}];
+            activeMultiplier = 1;
+            toggleMultiplier(1);
+            updateDisplay();
+        }
+
+        // Vytvoření tlačítek s čísly
+        const numberGrid = document.getElementById('numberGrid');
+        for (let i = 1; i <= 25; i++) {
+            const btn = document.createElement('button');
+            btn.textContent = i;
+            btn.className = 'number-btn';
+            btn.onclick = () => selectNumber(i);
+            numberGrid.appendChild(btn);
+        }
+
+                    // Hlasový vstup
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+            
+            recognition.lang = 'cs-CZ';
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            
+            let transcriptBuffer = '';
+            let processingTimeout = null;
+            
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            
+            recognition.onresult = function(event) {
+                clearTimeout(processingTimeout);
+                
+                const transcript = event.results[0][0].transcript;
+                console.log('Průběžný text:', transcript);
+                
+                processingTimeout = setTimeout(() => {
+                    console.log('Finální text:', transcript);
+                    const number = parseInt(transcript.replace(/\D/g, ''));
+                    
+                    if (!isNaN(number) && number > 0) {
+                        console.log('Odečítám:', number, 'od:', currentScore);
+                        currentScore -= number;
+                        updateDisplay();
+                        recognition.stop();
+                    }
+                }, 1500);
+            };
+            
+            recognition.onaudiostart = () => console.log('Audio začal');
+            recognition.onaudioend = () => console.log('Audio skončil');
+            recognition.onsoundstart = () => console.log('Zvuk detekován');
+            recognition.onsoundend = () => console.log('Zvuk skončil');
+            recognition.onspeechstart = () => console.log('Řeč detekována');
+            recognition.onspeechend = () => console.log('Řeč skončila');
+
+            document.getElementById('voiceBtn').onclick = () => {
+                console.log("Kliknuto na tlačítko hlasu");
+                recognition.start();
+            };
+        } else {
+            console.log("Hlasové rozpoznávání není podporováno");
+            document.getElementById('voiceBtn').style.display = 'none';
+        }
+
+        resetGame();
+    </script>
+</body>
+</html>
