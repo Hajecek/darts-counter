@@ -187,7 +187,7 @@
             numberGrid.appendChild(btn);
         }
 
-                    // Hlasový vstup
+        // Hlasový vstup
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             const recognition = new SpeechRecognition();
@@ -198,26 +198,34 @@
             
             let transcriptBuffer = '';
             let processingTimeout = null;
+            let isProcessing = false;
             
             recognition.continuous = true;
             recognition.interimResults = true;
             
             recognition.onresult = function(event) {
-                clearTimeout(processingTimeout);
+                if (isProcessing) return;
                 
+                clearTimeout(processingTimeout);
                 const transcript = event.results[0][0].transcript;
                 console.log('Průběžný text:', transcript);
                 
                 processingTimeout = setTimeout(() => {
+                    if (isProcessing) return;
+                    isProcessing = true;
+                    
                     console.log('Finální text:', transcript);
                     const number = parseInt(transcript.replace(/\D/g, ''));
                     
                     if (!isNaN(number) && number > 0) {
                         console.log('Odečítám:', number, 'od:', currentScore);
-                        currentScore -= number;
-                        updateDisplay();
+                        addScore(number);
                         recognition.stop();
                     }
+                    
+                    setTimeout(() => {
+                        isProcessing = false;
+                    }, 2000);
                 }, 1500);
             };
             
