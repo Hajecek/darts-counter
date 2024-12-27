@@ -56,8 +56,13 @@
             font-size: 16px;
             width: 100px;
         }
-        .voice-active .throws { display: none; }
-        .voice-active .throw-total { display: block; }
+        .voice-total-active .throws { display: none; }
+        .voice-total-active .throw-total { display: block; }
+        .voice-btn-active { background-color: #4CAF50; color: white; }
+        .current-throw-indicator {
+            color: #4CAF50;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -78,7 +83,8 @@
             <button onclick="addManualScore()" class="control-btn">Přidat</button>
         </div>
         <div class="controls">
-            <button id="voiceBtn" class="control-btn">🎤 Hlasový vstup</button>
+            <button id="voiceTotalBtn" class="control-btn">🎤 Hlasový vstup - celkem</button>
+            <button id="voicePerThrowBtn" class="control-btn">🎤 Hlasový vstup - jednotlivě</button>
             <button onclick="toggleMultiplier(2)" id="doubleBtn" class="control-btn">Double</button>
             <button onclick="toggleMultiplier(3)" id="tripleBtn" class="control-btn">Triple</button>
             <button onclick="undoLastThrow()" class="control-btn">↩️ Zpět</button>
@@ -94,43 +100,26 @@
         let activeMultiplier = 1;
         let currentRound = 1;
         let totalDarts = 0;
-        let isVoiceMode = false;
+        let voiceMode = 'none'; // 'none', 'total', 'perThrow'
+        let recognition = null;
+        let currentThrowIndex = 0;
         const maxThrows = 3;
 
         function convertSpokenNumberToCzech(text) {
             const numberWords = {
-                'nula': 0,
-                'jedna': 1,
-                'dvě': 2,
-                'tři': 3,
-                'čtyři': 4,
-                'pět': 5,
-                'šest': 6,
-                'sedm': 7,
-                'osm': 8,
-                'devět': 9,
-                'deset': 10,
-                'jedenáct': 11,
-                'dvanáct': 12,
-                'třináct': 13,
-                'čtrnáct': 14,
-                'patnáct': 15,
-                'šestnáct': 16,
-                'sedmnáct': 17,
-                'osmnáct': 18,
-                'devatenáct': 19,
-                'dvacet': 20
+                'nula': 0, 'jedna': 1, 'dvě': 2, 'tři': 3, 'čtyři': 4,
+                'pět': 5, 'šest': 6, 'sedm': 7, 'osm': 8, 'devět': 9,
+                'deset': 10, 'jedenáct': 11, 'dvanáct': 12, 'třináct': 13,
+                'čtrnáct': 14, 'patnáct': 15, 'šestnáct': 16, 'sedmnáct': 17,
+                'osmnáct': 18, 'devatenáct': 19, 'dvacet': 20
             };
 
-            // Convert text to lowercase and remove extra spaces
             text = text.toLowerCase().trim();
             
-            // Check if the text is directly in our dictionary
             if (numberWords.hasOwnProperty(text)) {
                 return numberWords[text];
             }
             
-            // If it's already a number (as string), parse it
             const numericValue = parseInt(text.replace(/\D/g, ''));
             if (!isNaN(numericValue)) {
                 return numericValue;
@@ -143,8 +132,8 @@
             const input = document.getElementById('manualInput');
             const value = parseInt(input.value);
             if (!isNaN(value) && value >= 0) {
-                if (isVoiceMode) {
-                    addVoiceScore(value);
+                if (voiceMode === 'total') {
+                    addVoiceTotal(value);
                 } else {
                     addScore(value);
                 }
@@ -179,9 +168,20 @@
                     updateDisplay();
                 }, 2000);
             }
+
+            if (voiceMode === 'perThrow') {
+                currentThrowIndex++;
+                updateThrowIndicators();
+                if (currentThrowIndex >= maxThrows) {
+                    setTimeout(() => {
+                        currentThrowIndex = 0;
+                        updateThrowIndicators();
+                    }, 2000);
+                }
+            }
         }
 
-        function addVoiceScore(points) {
+        function addVoiceTotal(points) {
             currentScore -= points;
             totalDarts += 3;
             history.push({
@@ -202,7 +202,21 @@
                     totalDarts: totalDarts
                 });
                 updateDisplay();
+                if (voiceMode === 'total' && recognition) {
+                    recognition.start();
+                }
             }, 2000);
+        }
+
+        function updateThrowIndicators() {
+            for (let i = 1; i <= maxThrows; i++) {
+                const throwElement = document.getElementById(`throw${i}`);
+                if (i - 1 === currentThrowIndex && voiceMode === 'perThrow') {
+                    throwElement.classList.add('current-throw-indicator');
+                } else {
+                    throwElement.classList.remove('current-throw-indicator');
+                }
+            }
         }
 
         function updateDisplay() {
@@ -210,7 +224,7 @@
             document.getElementById('roundCounter').textContent = currentRound;
             document.getElementById('totalDarts').textContent = totalDarts;
             
-            if (isVoiceMode) {
+            if (voiceMode === 'total') {
                 const lastState = history[history.length - 1];
                 document.getElementById('throwTotal').textContent = 
                     lastState.voiceTotal !== null ? `${lastState.voiceTotal}` : '-';
@@ -223,6 +237,7 @@
                         '-';
                 }
             }
+            updateThrowIndicators();
         }
 
         function saveState() {
@@ -235,7 +250,7 @@
         }
 
         function toggleMultiplier(value) {
-            if (!isVoiceMode) {
+            if (voiceMode === 'none') {
                 activeMultiplier = activeMultiplier === value ? 1 : value;
                 document.getElementById('doubleBtn').classList.toggle('active-multiplier', activeMultiplier === 2);
                 document.getElementById('tripleBtn').classList.toggle('active-multiplier', activeMultiplier === 3);
@@ -243,7 +258,7 @@
         }
 
         function selectNumber(num) {
-            if (isVoiceMode) return;
+            if (voiceMode !== 'none') return;
             if (throws.length >= maxThrows) return;
             
             const points = num * activeMultiplier;
@@ -279,6 +294,9 @@
                 throws = lastState.throws ? [...lastState.throws] : [];
                 currentRound = lastState.round;
                 totalDarts = lastState.totalDarts;
+                if (voiceMode === 'perThrow') {
+                    currentThrowIndex = Math.max(0, throws.length);
+                }
                 updateDisplay();
             }
         }
@@ -290,9 +308,30 @@
             activeMultiplier = 1;
             currentRound = 1;
             totalDarts = 0;
-            isVoiceMode = false;
-            document.querySelector('.container').classList.remove('voice-active');
+            currentThrowIndex = 0;
+            setVoiceMode('none');
             toggleMultiplier(1);
+            updateDisplay();
+        }
+
+        function setVoiceMode(mode) {
+            voiceMode = mode;
+            const container = document.querySelector('.container');
+            const voiceTotalBtn = document.getElementById('voiceTotalBtn');
+            const voicePerThrowBtn = document.getElementById('voicePerThrowBtn');
+            
+            container.classList.toggle('voice-total-active', mode === 'total');
+            voiceTotalBtn.classList.toggle('voice-btn-active', mode === 'total');
+            voicePerThrowBtn.classList.toggle('voice-btn-active', mode === 'perThrow');
+            
+            if (recognition) {
+                recognition.stop();
+                if (mode !== 'none') {
+                    recognition.start();
+                }
+            }
+            
+            currentThrowIndex = 0;
             updateDisplay();
         }
 
@@ -309,7 +348,7 @@
 
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            const recognition = new SpeechRecognition();
+            recognition = new SpeechRecognition();
             
             recognition.lang = 'cs-CZ';
             recognition.continuous = true;
@@ -322,7 +361,7 @@
                 if (isProcessing) return;
                 
                 clearTimeout(processingTimeout);
-                const transcript = event.results[0][0].transcript;
+                const transcript = event.results[event.results.length - 1][0].transcript;
                 console.log('Průběžný text:', transcript);
                 
                 processingTimeout = setTimeout(() => {
@@ -330,41 +369,52 @@
                     isProcessing = true;
                     
                     console.log('Finální text:', transcript);
-                    
-                    // Try to convert the spoken number
                     const number = convertSpokenNumberToCzech(transcript);
                     
                     if (number !== null) {
                         console.log('Odečítám:', number, 'od:', currentScore);
-                        addVoiceScore(number);
                         recognition.stop();
-                    }
-                    
-                    setTimeout(() => {
+                        
+                        if (voiceMode === 'total') {
+                            addVoiceTotal(number);
+                        } else if (voiceMode === 'perThrow') {
+                            addScore(number);
+                        }
+                        
+                        // Clear results and restart recognition after a delay
+                        setTimeout(() => {
+                            isProcessing = false;
+                            if (voiceMode !== 'none') {
+                                recognition.start();
+                            }
+                        }, 2000);
+                    } else {
                         isProcessing = false;
-                    }, 2000);
+                    }
                 }, 1500);
             };
 
-            recognition.onstart = function() {
-                isVoiceMode = true;
-                document.querySelector('.container').classList.add('voice-active');
-                updateDisplay();
-            };
-
             recognition.onend = function() {
-                isVoiceMode = false;
-                document.querySelector('.container').classList.remove('voice-active');
-                updateDisplay();
+                // Only auto-restart if we're not in the middle of processing a number
+                if (voiceMode !== 'none' && !isProcessing) {
+                    setTimeout(() => {
+                        recognition.start();
+                    }, 100);
+                }
             };
 
-            document.getElementById('voiceBtn').onclick = () => {
-                console.log("Kliknuto na tlačítko hlasu");
-                recognition.start();
+            document.getElementById('voiceTotalBtn').onclick = () => {
+                setVoiceMode(voiceMode === 'total' ? 'none' : 'total');
             };
+            
+            document.getElementById('voicePerThrowBtn').onclick = () => {
+                setVoiceMode(voiceMode === 'perThrow' ? 'none' : 'perThrow');
+            };
+
         } else {
             console.log("Hlasové rozpoznávání není podporováno");
-            document.getElementById('voiceBtn').style.display = 'none';
+            document.getElementById('voiceTotalBtn').style.display = 'none';
+            document.getElementById('voicePerThrowBtn').style.display = 'none';
         }
 
         resetGame();
