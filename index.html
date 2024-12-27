@@ -97,6 +97,48 @@
         let isVoiceMode = false;
         const maxThrows = 3;
 
+        function convertSpokenNumberToCzech(text) {
+            const numberWords = {
+                'nula': 0,
+                'jedna': 1,
+                'dvě': 2,
+                'tři': 3,
+                'čtyři': 4,
+                'pět': 5,
+                'šest': 6,
+                'sedm': 7,
+                'osm': 8,
+                'devět': 9,
+                'deset': 10,
+                'jedenáct': 11,
+                'dvanáct': 12,
+                'třináct': 13,
+                'čtrnáct': 14,
+                'patnáct': 15,
+                'šestnáct': 16,
+                'sedmnáct': 17,
+                'osmnáct': 18,
+                'devatenáct': 19,
+                'dvacet': 20
+            };
+
+            // Convert text to lowercase and remove extra spaces
+            text = text.toLowerCase().trim();
+            
+            // Check if the text is directly in our dictionary
+            if (numberWords.hasOwnProperty(text)) {
+                return numberWords[text];
+            }
+            
+            // If it's already a number (as string), parse it
+            const numericValue = parseInt(text.replace(/\D/g, ''));
+            if (!isNaN(numericValue)) {
+                return numericValue;
+            }
+            
+            return null;
+        }
+
         function addManualScore() {
             const input = document.getElementById('manualInput');
             const value = parseInt(input.value);
@@ -288,9 +330,11 @@
                     isProcessing = true;
                     
                     console.log('Finální text:', transcript);
-                    const number = parseInt(transcript.replace(/\D/g, ''));
                     
-                    if (!isNaN(number) && number >= 0) {
+                    // Try to convert the spoken number
+                    const number = convertSpokenNumberToCzech(transcript);
+                    
+                    if (number !== null) {
                         console.log('Odečítám:', number, 'od:', currentScore);
                         addVoiceScore(number);
                         recognition.stop();
