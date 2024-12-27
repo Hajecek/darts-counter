@@ -59,9 +59,9 @@
         .voice-total-active .throws { display: none; }
         .voice-total-active .throw-total { display: block; }
         .voice-btn-active { background-color: #4CAF50; color: white; }
-        .current-throw-indicator {
-            color: #4CAF50;
-            font-weight: bold;
+        .active-throw {
+            border: 2px solid #4CAF50;
+            background-color: #9dd19e;
         }
     </style>
 </head>
@@ -160,24 +160,20 @@
             saveState();
             updateDisplay();
             
+            if (currentThrowIndex < maxThrows - 1) {
+                currentThrowIndex++;
+                updateThrowIndicators();
+            }
+            
             if (throws.length >= maxThrows) {
                 setTimeout(() => {
                     throws = [];
                     currentRound++;
+                    currentThrowIndex = 0;
                     saveState();
                     updateDisplay();
+                    updateThrowIndicators();
                 }, 2000);
-            }
-
-            if (voiceMode === 'perThrow') {
-                currentThrowIndex++;
-                updateThrowIndicators();
-                if (currentThrowIndex >= maxThrows) {
-                    setTimeout(() => {
-                        currentThrowIndex = 0;
-                        updateThrowIndicators();
-                    }, 2000);
-                }
             }
         }
 
@@ -211,10 +207,12 @@
         function updateThrowIndicators() {
             for (let i = 1; i <= maxThrows; i++) {
                 const throwElement = document.getElementById(`throw${i}`);
-                if (i - 1 === currentThrowIndex && voiceMode === 'perThrow') {
+                if (i - 1 === currentThrowIndex) {
                     throwElement.classList.add('current-throw-indicator');
+                    throwElement.classList.add('active-throw');
                 } else {
                     throwElement.classList.remove('current-throw-indicator');
+                    throwElement.classList.remove('active-throw');
                 }
             }
         }
@@ -270,7 +268,12 @@
             currentScore -= points;
             totalDarts++;
             saveState();
+            
+            if (currentThrowIndex < maxThrows - 1) {
+                currentThrowIndex++;
+            }
             updateDisplay();
+            updateThrowIndicators();
             
             if (activeMultiplier !== 1) {
                 toggleMultiplier(activeMultiplier);
@@ -280,8 +283,10 @@
                 setTimeout(() => {
                     throws = [];
                     currentRound++;
+                    currentThrowIndex = 0;
                     saveState();
                     updateDisplay();
+                    updateThrowIndicators();
                 }, 2000);
             }
         }
@@ -312,6 +317,7 @@
             setVoiceMode('none');
             toggleMultiplier(1);
             updateDisplay();
+            updateThrowIndicators();
         }
 
         function setVoiceMode(mode) {
