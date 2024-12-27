@@ -30,6 +30,15 @@
             min-width: 100px;
             text-align: center;
         }
+        .throw-total {
+            padding: 15px;
+            border: 1px solid #ccc;
+            min-width: 150px;
+            text-align: center;
+            margin: 20px 0;
+            font-size: 18px;
+            display: none;
+        }
         .score { font-size: 24px; margin: 20px 0; }
         .stats {
             display: flex;
@@ -47,6 +56,8 @@
             font-size: 16px;
             width: 100px;
         }
+        .voice-active .throws { display: none; }
+        .voice-active .throw-total { display: block; }
     </style>
 </head>
 <body>
@@ -61,6 +72,7 @@
             <div class="throw" id="throw2">-</div>
             <div class="throw" id="throw3">-</div>
         </div>
+        <div class="throw-total" id="throwTotal">-</div>
         <div class="input-area">
             <input type="number" id="manualInput" placeholder="Zadej body">
             <button onclick="addManualScore()" class="control-btn">Přidat</button>
@@ -82,13 +94,18 @@
         let activeMultiplier = 1;
         let currentRound = 1;
         let totalDarts = 0;
+        let isVoiceMode = false;
         const maxThrows = 3;
 
         function addManualScore() {
             const input = document.getElementById('manualInput');
             const value = parseInt(input.value);
-            if (!isNaN(value) && value > 0) {
-                addScore(value);
+            if (!isNaN(value) && value >= 0) {
+                if (isVoiceMode) {
+                    addVoiceScore(value);
+                } else {
+                    addScore(value);
+                }
                 input.value = '';
             }
         }
@@ -122,17 +139,47 @@
             }
         }
 
+        function addVoiceScore(points) {
+            currentScore -= points;
+            totalDarts += 3;
+            history.push({
+                score: currentScore,
+                voiceTotal: points,
+                round: currentRound,
+                totalDarts: totalDarts
+            });
+            updateDisplay();
+            
+            setTimeout(() => {
+                currentRound++;
+                throws = [];
+                history.push({
+                    score: currentScore,
+                    voiceTotal: null,
+                    round: currentRound,
+                    totalDarts: totalDarts
+                });
+                updateDisplay();
+            }, 2000);
+        }
+
         function updateDisplay() {
             document.getElementById('currentScore').textContent = currentScore;
             document.getElementById('roundCounter').textContent = currentRound;
             document.getElementById('totalDarts').textContent = totalDarts;
             
-            for (let i = 1; i <= maxThrows; i++) {
-                const throwElement = document.getElementById(`throw${i}`);
-                const throwValue = throws[i-1];
-                throwElement.textContent = throwValue ? 
-                    `${throwValue.points} (${throwValue.base}×${throwValue.multiplier})` : 
-                    '-';
+            if (isVoiceMode) {
+                const lastState = history[history.length - 1];
+                document.getElementById('throwTotal').textContent = 
+                    lastState.voiceTotal !== null ? `${lastState.voiceTotal}` : '-';
+            } else {
+                for (let i = 1; i <= maxThrows; i++) {
+                    const throwElement = document.getElementById(`throw${i}`);
+                    const throwValue = throws[i-1];
+                    throwElement.textContent = throwValue ? 
+                        `${throwValue.points} (${throwValue.base}×${throwValue.multiplier})` : 
+                        '-';
+                }
             }
         }
 
@@ -146,12 +193,15 @@
         }
 
         function toggleMultiplier(value) {
-            activeMultiplier = activeMultiplier === value ? 1 : value;
-            document.getElementById('doubleBtn').classList.toggle('active-multiplier', activeMultiplier === 2);
-            document.getElementById('tripleBtn').classList.toggle('active-multiplier', activeMultiplier === 3);
+            if (!isVoiceMode) {
+                activeMultiplier = activeMultiplier === value ? 1 : value;
+                document.getElementById('doubleBtn').classList.toggle('active-multiplier', activeMultiplier === 2);
+                document.getElementById('tripleBtn').classList.toggle('active-multiplier', activeMultiplier === 3);
+            }
         }
 
         function selectNumber(num) {
+            if (isVoiceMode) return;
             if (throws.length >= maxThrows) return;
             
             const points = num * activeMultiplier;
@@ -184,7 +234,7 @@
                 history.pop();
                 const lastState = history[history.length - 1];
                 currentScore = lastState.score;
-                throws = [...lastState.throws];
+                throws = lastState.throws ? [...lastState.throws] : [];
                 currentRound = lastState.round;
                 totalDarts = lastState.totalDarts;
                 updateDisplay();
@@ -198,11 +248,12 @@
             activeMultiplier = 1;
             currentRound = 1;
             totalDarts = 0;
+            isVoiceMode = false;
+            document.querySelector('.container').classList.remove('voice-active');
             toggleMultiplier(1);
             updateDisplay();
         }
 
-        // Vytvoření tlačítek s čísly
         const numberGrid = document.getElementById('numberGrid');
         const numbers = [...Array(20).keys()].map(i => i + 1);
         numbers.push(25, 0);
@@ -214,7 +265,6 @@
             numberGrid.appendChild(btn);
         }
 
-        // Hlasový vstup
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             const recognition = new SpeechRecognition();
@@ -223,12 +273,8 @@
             recognition.continuous = true;
             recognition.interimResults = true;
             
-            let transcriptBuffer = '';
             let processingTimeout = null;
             let isProcessing = false;
-            
-            recognition.continuous = true;
-            recognition.interimResults = true;
             
             recognition.onresult = function(event) {
                 if (isProcessing) return;
@@ -244,9 +290,9 @@
                     console.log('Finální text:', transcript);
                     const number = parseInt(transcript.replace(/\D/g, ''));
                     
-                    if (!isNaN(number) && number > 0) {
+                    if (!isNaN(number) && number >= 0) {
                         console.log('Odečítám:', number, 'od:', currentScore);
-                        addScore(number);
+                        addVoiceScore(number);
                         recognition.stop();
                     }
                     
@@ -255,13 +301,18 @@
                     }, 2000);
                 }, 1500);
             };
-            
-            recognition.onaudiostart = () => console.log('Audio začal');
-            recognition.onaudioend = () => console.log('Audio skončil');
-            recognition.onsoundstart = () => console.log('Zvuk detekován');
-            recognition.onsoundend = () => console.log('Zvuk skončil');
-            recognition.onspeechstart = () => console.log('Řeč detekována');
-            recognition.onspeechend = () => console.log('Řeč skončila');
+
+            recognition.onstart = function() {
+                isVoiceMode = true;
+                document.querySelector('.container').classList.add('voice-active');
+                updateDisplay();
+            };
+
+            recognition.onend = function() {
+                isVoiceMode = false;
+                document.querySelector('.container').classList.remove('voice-active');
+                updateDisplay();
+            };
 
             document.getElementById('voiceBtn').onclick = () => {
                 console.log("Kliknuto na tlačítko hlasu");
