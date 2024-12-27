@@ -1,13 +1,22 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=clash-display@400,700,500,600&display=swap">
     <style>
-        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        body {
+            font-family: 'Clash Display', sans-serif;
+        }
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; padding-bottom: calc(7 * (100vw / 7 + 5px) + 80px); }
         .number-grid {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
+            grid-template-columns: repeat(7, 1fr);
             gap: 5px;
-            margin: 20px 0;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 5px;
+            background: white;
         }
         .number-btn, .control-btn {
             padding: 15px;
@@ -16,8 +25,16 @@
             border: 1px solid #ccc;
             background: white;
         }
+
+        .control-btn-back {  padding: 15px;
+            font-size: 16px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            color: white;
+        background-color: rgb(63, 146, 255); 
+    }
         .selected { background-color: #4CAF50; color: white; }
-        .active-multiplier { background-color: #ff4444; color: white; }
+        .active-multiplier { background-color: #c8c8c870 !important; color: rgb(0, 0, 0)!important; }
         .controls { margin: 20px 0; }
         .throws {
             display: flex;
@@ -39,7 +56,11 @@
             font-size: 18px;
             display: none;
         }
-        .score { font-size: 24px; margin: 20px 0; }
+        .score { 
+            font-size: 48px; 
+            margin: 20px 0; 
+            font-weight: bold;
+        }
         .stats {
             display: flex;
             gap: 20px;
@@ -63,11 +84,60 @@
             border: 2px solid #4CAF50;
             background-color: #9dd19e;
         }
+        .multiplier-btn {
+            grid-column: span 7;
+            margin-bottom: 5px;
+        }
+        #doubleBtn {
+            color: white;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            border: 1px solid rgb(245, 190, 88);
+            background-color: rgb(255, 166, 2);
+            grid-column: 1 / 4;
+        }
+        #tripleBtn {
+            color: white;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            border: 1px solid rgb(245, 88, 88);
+            background-color: rgb(255, 2, 2);
+            grid-column: 4 / 8;
+        }
+        .undo-btn {
+            grid-column: span 7;
+            margin-top: 5px;
+        }
+        .number-btn:disabled {
+            pointer-events: none;
+            background-color: #f0f0f0;
+        }
+        .error-banner {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(255, 68, 68, 0.95);
+            color: white;
+            display: none;
+            z-index: 1000;
+            text-align: center;
+            font-size: 24px;
+            padding: 20px 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            min-width: 300px;
+            max-width: 80%;
+        }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 </head>
 <body>
+    <div id="errorBanner" class="error-banner"></div>
     <div class="container">
-        <div class="score">Score: <span id="currentScore">501</span></div>
+        <div class="score"><span id="currentScore">501</span></div>
         <div class="stats">
             <div>Kolo: <span id="roundCounter">1</span></div>
             <div>Celkem šipek: <span id="totalDarts">0</span></div>
@@ -89,12 +159,12 @@
         <div class="controls">
             <button id="voiceTotalBtn" class="control-btn">🎤 Hlasový vstup - celkem</button>
             <button id="voicePerThrowBtn" class="control-btn">🎤 Hlasový vstup - jednotlivě</button>
-            <button onclick="toggleMultiplier(2)" id="doubleBtn" class="control-btn">Double</button>
-            <button onclick="toggleMultiplier(3)" id="tripleBtn" class="control-btn">Triple</button>
-            <button onclick="undoLastThrow()" class="control-btn">↩️ Zpět</button>
             <button onclick="resetGame()" class="control-btn">🔄 Reset</button>
         </div>
-        <div id="numberGrid" class="number-grid"></div>
+        <div id="numberGrid" class="number-grid">
+            <button onclick="toggleMultiplier(2)" id="doubleBtn" class="control-btn multiplier-btn">Double</button>
+            <button onclick="toggleMultiplier(3)" id="tripleBtn" class="control-btn multiplier-btn">Triple</button>
+        </div>
     </div>
 
     <script>
@@ -119,6 +189,10 @@
             };
 
             text = text.toLowerCase().trim();
+            
+            if (text === 'zpět' || text === 'zpet') {
+                return 'undo';
+            }
             
             if (numberWords.hasOwnProperty(text)) {
                 return numberWords[text];
@@ -152,6 +226,16 @@
         });
 
         function addScore(points) {
+            if (points > 60) {
+                showErrorBanner('Nelze hodit více než 60 bodů jednou šipkou!');
+                if (recognition) {
+                    setTimeout(() => {
+                        recognition.start();
+                    }, 1000);
+                }
+                return;
+            }
+            
             if (throws.length >= maxThrows) return;
             
             currentScore -= points;
@@ -181,7 +265,26 @@
             }
         }
 
+        function showErrorBanner(message) {
+            const banner = document.getElementById('errorBanner');
+            banner.textContent = message;
+            banner.style.display = 'block';
+            setTimeout(() => {
+                banner.style.display = 'none';
+            }, 3000);
+        }
+
         function addVoiceTotal(points) {
+            if (points > 180) {
+                showErrorBanner('Nelze hodit více než 180 bodů na tři šipky!');
+                if (recognition) {
+                    setTimeout(() => {
+                        recognition.start();
+                    }, 1000);
+                }
+                return;
+            }
+            
             currentScore -= points;
             totalDarts += 3;
             history.push({
@@ -244,7 +347,14 @@
         }
 
         function updateDisplay() {
-            document.getElementById('currentScore').textContent = currentScore;
+            // Animace skóre pomocí GSAP
+            gsap.to("#currentScore", {
+                duration: 0.5,
+                innerText: currentScore,
+                snap: { innerText: 1 },
+                ease: "power2.out"
+            });
+            
             document.getElementById('roundCounter').textContent = currentRound;
             document.getElementById('totalDarts').textContent = totalDarts;
             
@@ -283,6 +393,22 @@
                 activeMultiplier = activeMultiplier === value ? 1 : value;
                 document.getElementById('doubleBtn').classList.toggle('active-multiplier', activeMultiplier === 2);
                 document.getElementById('tripleBtn').classList.toggle('active-multiplier', activeMultiplier === 3);
+                
+                // Úprava: Deaktivace tlačítek pro nulu a 25 při triple
+                const zeroButton = document.querySelector('.number-btn[data-value="0"]');
+                const bull25Button = document.querySelector('.number-btn[data-value="25"]');
+                
+                if (zeroButton) {
+                    zeroButton.disabled = activeMultiplier !== 1;
+                    zeroButton.style.opacity = activeMultiplier === 1 ? '1' : '0.5';
+                    zeroButton.style.cursor = activeMultiplier === 1 ? 'pointer' : 'not-allowed';
+                }
+                
+                if (bull25Button) {
+                    bull25Button.disabled = activeMultiplier === 3;
+                    bull25Button.style.opacity = activeMultiplier === 3 ? '0.5' : '1';
+                    bull25Button.style.cursor = activeMultiplier === 3 ? 'not-allowed' : 'pointer';
+                }
             }
         }
 
@@ -330,10 +456,17 @@
                 throws = lastState.throws ? [...lastState.throws] : [];
                 currentRound = lastState.round;
                 totalDarts = lastState.totalDarts;
-                if (voiceMode === 'perThrow') {
-                    currentThrowIndex = Math.max(0, throws.length);
+                
+                // Přidaná kontrola - pokud se vrátíme na 501, resetujeme statistiky
+                if (currentScore === 501) {
+                    currentRound = 1;
+                    totalDarts = 0;
+                    history = [{score: 501, throws: []}];
                 }
+                
+                currentThrowIndex = throws.length;
                 updateDisplay();
+                updateThrowIndicators();
             }
         }
 
@@ -379,8 +512,19 @@
             const btn = document.createElement('button');
             btn.textContent = i;
             btn.className = 'number-btn';
+            btn.setAttribute('data-value', i);
             btn.onclick = () => selectNumber(i);
             numberGrid.appendChild(btn);
+            
+            // Přidání tlačítka Zpět hned za nulu
+            if (i === 0) {
+                const undoBtn = document.createElement('button');
+                undoBtn.textContent = '↩️ Zpět';
+                undoBtn.className = 'control-btn-back';
+                undoBtn.onclick = undoLastThrow;
+                undoBtn.style.gridColumn = 'span 6'; // Roztáhne se přes zbývající sloupce
+                numberGrid.appendChild(undoBtn);
+            }
         }
 
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -406,19 +550,28 @@
                     isProcessing = true;
                     
                     console.log('Finální text:', transcript);
-                    const number = convertSpokenNumberToCzech(transcript);
+                    const result = convertSpokenNumberToCzech(transcript);
                     
-                    if (number !== null) {
-                        console.log('Odečítám:', number, 'od:', currentScore);
+                    if (result === 'undo') {
+                        recognition.stop();
+                        undoLastThrow();
+                        // Restartujeme rozpoznávání po krátké pauze
+                        setTimeout(() => {
+                            isProcessing = false;
+                            if (voiceMode !== 'none') {
+                                recognition.start();
+                            }
+                        }, 2000);
+                    } else if (result !== null) {
+                        console.log('Odečítám:', result, 'od:', currentScore);
                         recognition.stop();
                         
                         if (voiceMode === 'total') {
-                            addVoiceTotal(number);
+                            addVoiceTotal(result);
                         } else if (voiceMode === 'perThrow') {
-                            addScore(number);
+                            addScore(result);
                         }
                         
-                        // Clear results and restart recognition after a delay
                         setTimeout(() => {
                             isProcessing = false;
                             if (voiceMode !== 'none') {
