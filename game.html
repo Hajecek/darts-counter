@@ -535,6 +535,7 @@
                     updateThrowIndicators();
                 }, 2000);
             }
+            updateCheckoutSuggestions();
         }
 
         function showErrorBanner(message) {
@@ -581,6 +582,7 @@
                     recognition.start();
                 }
             }, 2000);
+            updateCheckoutSuggestions();
         }
 
         function updateThrowIndicators() {
