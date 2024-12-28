@@ -401,6 +401,8 @@ let recognition = null;
 let currentThrowIndex = 0;
 const maxThrows = 3;
 let gridVisible = true;
+let winBannerDisplayed = false; // Přidání proměnné pro sledování stavu banneru
+let winBanner; // Přidání proměnné pro uchování odkazu na banner
 
 function updateCheckoutSuggestions() {
     const remainingThrows = 3 - (voiceMode === 'total' ? 0 : throws.length);
@@ -666,6 +668,9 @@ function updateDisplay() {
     } else {
         clearCheckoutDisplay();
     }
+    
+    // Kontrola vítězství
+    checkWinCondition();
 }
 
 function saveState() {
@@ -772,6 +777,12 @@ function resetGame() {
     toggleMultiplier(1);
     clearCheckoutDisplay();
     updateDisplay();
+    
+    // Skrytí banneru, pokud existuje
+    if (winBanner) {
+        winBanner.remove(); // Odstranění banneru z DOM
+        winBannerDisplayed = false; // Resetování stavu banneru
+    }
 }
 
 function setVoiceMode(mode) {
@@ -910,6 +921,53 @@ document.getElementById('hideGridBtn').onclick = () => {
     
     gridVisible = !gridVisible;
 };
+
+function checkWinCondition() {
+    if (currentScore === 0 && !winBannerDisplayed) { // Kontrola, zda banner již byl zobrazen
+        winBannerDisplayed = true; // Nastavení stavu banneru na zobrazený
+        winBanner = document.createElement('div'); // Uložení odkazu na banner
+        winBanner.textContent = 'Vyhráli jste!';
+        winBanner.style.position = 'fixed';
+        winBanner.style.top = '0';
+        winBanner.style.left = '0';
+        winBanner.style.width = '100%';
+        winBanner.style.height = '100%';
+        winBanner.style.backgroundColor = 'rgba(0, 128, 0, 0.8)';
+        winBanner.style.color = 'white';
+        winBanner.style.fontSize = '48px';
+        winBanner.style.display = 'flex';
+        winBanner.style.flexDirection = 'column';
+        winBanner.style.alignItems = 'center';
+        winBanner.style.justifyContent = 'center';
+        winBanner.style.zIndex = '1000';
+        winBanner.style.opacity = '0'; // Počáteční průhlednost
+        winBanner.style.transition = 'opacity 1s ease-in-out'; // Přidání animace
+        document.body.appendChild(winBanner);
+
+        // Zobrazit průměr hráče
+        const averages = calculateAverages();
+        const avgDisplay = document.createElement('div');
+        avgDisplay.textContent = `Průměr na 3 šipky: ${averages.avgPerThree}, Průměr prvních 9: ${averages.avgFirstNine}`;
+        avgDisplay.style.fontSize = '24px';
+        avgDisplay.style.marginTop = '20px';
+        winBanner.appendChild(avgDisplay);
+
+        // Přidání resetovacího tlačítka
+        const resetButton = document.createElement('button');
+        resetButton.textContent = 'Znovu hrát';
+        resetButton.style.marginTop = '20px';
+        resetButton.style.padding = '10px 20px';
+        resetButton.style.fontSize = '20px';
+        resetButton.style.cursor = 'pointer';
+        resetButton.onclick = resetGame; // Připojení funkce resetGame
+        winBanner.appendChild(resetButton);
+
+        // Spustit animaci
+        setTimeout(() => {
+            winBanner.style.opacity = '1'; // Změna opacity pro animaci
+        }, 100);
+    }
+}
 
 resetGame();
 </script>
